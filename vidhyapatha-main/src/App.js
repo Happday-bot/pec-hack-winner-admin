@@ -11,8 +11,6 @@ import {
 } from "react-router-dom";
 import { Bell, User } from "lucide-react";
 
-
-
 // Pages
 import Dashboard from "./Dashboard";
 import Suggestedcourses from "./Suggestedcourses";
@@ -24,18 +22,18 @@ import SignIn from "./SignIn";
 import SignUp from "./SignUp";
 import ProfileSetupBasic from "./ProfileSetupBasic";
 import Resources from "./Resources";
-import TimelineTracker from "./Timelinetracker";
+// import TimelineTracker from "./Timelinetracker";
 import AboutUs from "./AboutUs";
 import RoadmapPage from "./RoadmapPage";
 import Examinations from "./Examination";
 import ProfileView from "./ProfilePage";
-
 
 // --------------------------- NAVBAR ---------------------------
 function Navbar({ onLogout }) {
   const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const navigate = useNavigate();
+
   const navItems = [
     { to: "/dashboard", label: "Dashboard" },
     { to: "/courses", label: "Courses" },
@@ -44,11 +42,9 @@ function Navbar({ onLogout }) {
     { to: "/scholarships", label: "Scholarships" },
     { to: "/exam", label: "Examinations" },
     { to: "/resources", label: "Resources" },
-    
   ];
 
   return (
-
     <nav className="backdrop-blur-md bg-white/80 shadow-sm border-b border-gray-200 flex items-center justify-between px-8 py-4 sticky top-0 z-50">
       {/* Left Navigation Items */}
       <div className="flex items-center justify-between w-[55%]">
@@ -68,8 +64,6 @@ function Navbar({ onLogout }) {
 
       {/* Right Side Section */}
       <div className="flex items-center space-x-4 relative">
-       
-
         {/* Bell */}
         <button className="relative">
           <Bell size={24} />
@@ -94,6 +88,8 @@ function Navbar({ onLogout }) {
                 Profile
               </Link>
 
+              {/* Timeline removed */}
+              {/* 
               <Link
                 to="/timeline"
                 className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
@@ -101,6 +97,7 @@ function Navbar({ onLogout }) {
               >
                 Timeline
               </Link>
+              */}
 
               <Link
                 to="/about"
@@ -142,17 +139,8 @@ function App() {
     () => sessionStorage.getItem("isAuthenticated") === "true"
   );
 
-  // useEffect(() => {
-  //   const storedAuth = sessionStorage.getItem("isAuthenticated");
-  //   if (storedAuth === "true") {
-  //     setIsAuthenticated(true);
-  //   }
-  // }, []);
-
-
   const handleLogin = () => {
     sessionStorage.setItem("isAuthenticated", "true");
-    
     setIsAuthenticated(true);
   };
 
@@ -172,7 +160,7 @@ function App() {
     "/test",
     "/RoadmapPage",
     "/exam",
-    "/timeline",
+    // "/timeline",
     "/about",
     "/profile",
   ];
@@ -182,27 +170,25 @@ function App() {
 
   return (
     <>
-      {showNavbar && location.pathname !== "/test" && <Navbar onLogout={handleLogout} />}
+      {showNavbar && location.pathname !== "/test" && (
+        <Navbar onLogout={handleLogout} />
+      )}
 
       <Routes>
         {/* Public Pages */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/signin" element={<SignIn onLogin={handleLogin} />} />
         <Route path="/signup" element={<SignUp onSignup={handleLogin} />} />
-<Route
-  path="/profile-setup-basic"
-  element={
-    <ProfileSetupBasic
-      onLogin={handleLogin}
-      onUpdateDepartment={() => {}}
-    />
-    
-  }
-/>
 
-       
-        {/* Supabase Auth Callback */}
-       
+        <Route
+          path="/profile-setup-basic"
+          element={
+            <ProfileSetupBasic
+              onLogin={handleLogin}
+              onUpdateDepartment={() => {}}
+            />
+          }
+        />
 
         <Route path="/RoadmapPage" element={<RoadmapPage />} />
 
@@ -261,6 +247,8 @@ function App() {
           }
         />
 
+        {/* Timeline route removed */}
+        {/* 
         <Route
           path="/timeline"
           element={
@@ -269,6 +257,7 @@ function App() {
             </PrivateRoute>
           }
         />
+        */}
 
         <Route
           path="/about"
@@ -278,8 +267,6 @@ function App() {
             </PrivateRoute>
           }
         />
-
-       
 
         <Route
           path="/profile"
@@ -298,15 +285,15 @@ function App() {
             </PrivateRoute>
           }
         />
-        <Route
-  path="/profilepage"
-  element={
-    <PrivateRoute isAuthenticated={isAuthenticated}>
-      <ProfileView />
-    </PrivateRoute>
-  }
-/>
 
+        <Route
+          path="/profilepage"
+          element={
+            <PrivateRoute isAuthenticated={isAuthenticated}>
+              <ProfileView />
+            </PrivateRoute>
+          }
+        />
       </Routes>
     </>
   );

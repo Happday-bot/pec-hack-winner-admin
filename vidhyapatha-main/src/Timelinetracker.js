@@ -1,5 +1,5 @@
 // src/TimelineTracker.js
-import React, { useState } from "react";
+/*import React, { useState } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 
@@ -144,7 +144,6 @@ const handleAddEvent = async (e) => {
       </header>
 
       <div className="flex flex-1 p-8 gap-8">
-        {/* Main Calendar + Lists */}
         <main className="flex-1">
           <div className="bg-white rounded-2xl p-8 shadow-lg mb-8">
             <Calendar
@@ -154,7 +153,6 @@ const handleAddEvent = async (e) => {
             />
           </div>
 
-          {/* Past Events */}
           <div className="mb-8">
             <h3 className="text-xl font-bold mb-4">Past Events</h3>
             {pastEvents.length ? (
@@ -191,7 +189,6 @@ const handleAddEvent = async (e) => {
             )}
           </div>
 
-          {/* Upcoming Events */}
           <div>
             <h3 className="text-xl font-bold mb-4">Upcoming Events</h3>
             {upcomingEvents.length ? (
@@ -229,7 +226,6 @@ const handleAddEvent = async (e) => {
           </div>
         </main>
 
-        {/* Side Panel: Selected Date + Add/Edit Form */}
         <aside className="w-96 bg-white rounded-2xl p-6 shadow-lg">
           {selectedDate && (
             <>
@@ -320,4 +316,5 @@ const handleAddEvent = async (e) => {
   );
 };
 
-export default TimelineTracker;
+export default TimelineTracker;*/
+

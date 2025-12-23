@@ -34,7 +34,7 @@ const Select = ({ label, name, value, onChange, options }) => (
   </div>
 );
 
-export default function ProfileSetupBasic({ onUpdateDepartment ,onLogin }) {
+export default function ProfileSetupBasic({ /* onUpdateDepartment, */ onLogin }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
@@ -45,7 +45,7 @@ export default function ProfileSetupBasic({ onUpdateDepartment ,onLogin }) {
     dob: "",
     phone: "",
     gender: "",
-    department: "",
+    // department: "",
   });
 
   const handleChange = (e) => {
@@ -55,10 +55,10 @@ export default function ProfileSetupBasic({ onUpdateDepartment ,onLogin }) {
   const handleNext = async (e) => {
     e.preventDefault();
 
-    if (!form.department) {
-      alert("Please select a Department");
-      return;
-    }
+    // if (!form.department) {
+    //   alert("Please select a Department");
+    //   return;
+    // }
 
     setLoading(true);
 
@@ -72,19 +72,18 @@ export default function ProfileSetupBasic({ onUpdateDepartment ,onLogin }) {
           dob: form.dob,
           phone: Number(form.phone),
           gender: form.gender,
-          department: form.department,
+          // department: form.department,
         },
       ]);
 
     setLoading(false);
 
     if (error) {
-  console.error("Supabase error:", error);
-  alert(error.message);
-}
-else {
-      if (onUpdateDepartment) onUpdateDepartment(form.department);
-  onLogin(); // sets React state + sessionStorage
+      console.error("Supabase error:", error);
+      alert(error.message);
+    } else {
+      // if (onUpdateDepartment) onUpdateDepartment(form.department);
+      onLogin(); // sets React state + sessionStorage
       navigate("/dashboard");
     }
   };
@@ -97,11 +96,45 @@ else {
 
       <form onSubmit={handleNext}>
         <div className="grid grid-cols-1 gap-y-6">
-          <Input label="First Name *" name="firstName" value={form.firstName} onChange={handleChange} required />
-          <Input label="Middle Name" name="middleName" value={form.middleName} onChange={handleChange} />
-          <Input label="Last Name *" name="lastName" value={form.lastName} onChange={handleChange} required />
-          <Input label="Date of Birth *" type="date" name="dob" value={form.dob} onChange={handleChange} required />
-          <Input label="Phone Number *" name="phone" value={form.phone} onChange={handleChange} required />
+          <Input
+            label="First Name *"
+            name="firstName"
+            value={form.firstName}
+            onChange={handleChange}
+            required
+          />
+
+          <Input
+            label="Middle Name"
+            name="middleName"
+            value={form.middleName}
+            onChange={handleChange}
+          />
+
+          <Input
+            label="Last Name *"
+            name="lastName"
+            value={form.lastName}
+            onChange={handleChange}
+            required
+          />
+
+          <Input
+            label="Date of Birth *"
+            type="date"
+            name="dob"
+            value={form.dob}
+            onChange={handleChange}
+            required
+          />
+
+          <Input
+            label="Phone Number *"
+            name="phone"
+            value={form.phone}
+            onChange={handleChange}
+            required
+          />
 
           <Select
             label="Gender *"
@@ -117,28 +150,7 @@ else {
           />
         </div>
 
-        <div className="flex flex-col mt-6">
-          <label className="text-[#444EE7] font-medium">
-            Department of Education<span className="text-red-500">*</span>
-          </label>
-          <select
-            name="department"
-            value={form.department}
-            onChange={handleChange}
-            className="w-full border border-[#C7CBFF] rounded-lg p-2 focus:ring-2 focus:ring-[#6B74FF]"
-            required
-          >
-            <option value="">Select Department</option>
-            <option value="minister">Minister</option>
-            <option value="secretary">Secretary</option>
-            <option value="arts-science">Arts & Science</option>
-            <option value="engineering">Engineering</option>
-            <option value="medical">Medical</option>
-            <option value="law">Law</option>
-            <option value="commerce">Commerce</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
+        {/* Department section removed */}
 
         <div className="text-center">
           <button

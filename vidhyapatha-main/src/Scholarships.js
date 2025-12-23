@@ -1,41 +1,55 @@
 import React, { useEffect, useState } from "react";
-import { Edit, Trash, Plus, X } from "lucide-react";
+import { Plus, Edit, Trash } from "lucide-react";
 import { supabase } from "./supabase";
+
+/* ---------------- SCHOLARSHIP SCHEMA ---------------- */
+const SCHOLARSHIP_FIELDS = {
+  name: "text",
+  provider: "text",
+  type: "text",
+  region: "text",
+  education_level: "json",
+  gender: "text",
+  category: "json",
+  income_limit: "text",
+  amount_benefit: "text",
+  deadline: "text",
+  link: "text",
+  description: "text",
+  eligibility_details: "text",
+  documents_needed: "json",
+};
+
+const emptyScholarship = Object.keys(SCHOLARSHIP_FIELDS).reduce((a, k) => {
+  a[k] = "";
+  return a;
+}, {});
 
 export default function AdminScholarships() {
   const [scholarships, setScholarships] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
 
-  const emptyForm = {
-    name: "",
-    provider: "",
+  /* ---------------- SEARCH & FILTERS (NEW) ---------------- */
+  const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState({
     type: "",
-    region: "",
-    education_level: "",
     gender: "",
     category: "",
-    income_limit: "",
-    amount_benefit: "",
-    deadline: "",
-    link: "",
-    description: "",
-    eligibility_details: "",
-    documents_needed: "",
-  };
+  });
 
-  const [form, setForm] = useState(emptyForm);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [formData, setFormData] = useState(emptyScholarship);
 
-  /* ---------------- Fetch ---------------- */
+  /* ---------------- FETCH ---------------- */
   const fetchScholarships = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("scholarships")
       .select("*")
-      .order("id");
+      .order("id", { ascending: false });
 
-    if (!error) setScholarships(data || []);
+    setScholarships(data || []);
     setLoading(false);
   };
 
@@ -43,201 +57,219 @@ export default function AdminScholarships() {
     fetchScholarships();
   }, []);
 
-  /* ---------------- Handlers ---------------- */
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((p) => ({ ...p, [name]: value }));
-  };
+  /* ---------------- SAVE (ADD / EDIT) ---------------- */
+  const saveScholarship = async () => {
+    const payload = {};
 
-  const handleSave = async () => {
-    const payload = {
-      ...form,
-      education_level: form.education_level.split(",").map((i) => i.trim()),
-      category: form.category.split(",").map((i) => i.trim()),
-      documents_needed: form.documents_needed.split(",").map((i) => i.trim()),
-    };
+    Object.entries(SCHOLARSHIP_FIELDS).forEach(([k, t]) => {
+      payload[k] =
+        t === "json"
+          ? formData[k]
+              .split(",")
+              .map(v => v.trim())
+              .filter(Boolean)
+          : formData[k];
+    });
 
-    if (editingId) {
-      await supabase.from("scholarships").update(payload).eq("id", editingId);
-    } else {
-      await supabase.from("scholarships").insert([payload]);
+    const query = editingId
+      ? supabase.from("scholarships").update(payload).eq("id", editingId)
+      : supabase.from("scholarships").insert(payload);
+
+    const { error } = await query;
+    if (error) {
+      alert("Save failed");
+      console.error(error);
+      return;
     }
 
-    resetForm();
+    setShowForm(false);
+    setEditingId(null);
+    setFormData(emptyScholarship);
     fetchScholarships();
   };
 
-  const handleEdit = (s) => {
-    setForm({
-      ...s,
-      education_level: s.education_level?.join(", ") || "",
-      category: s.category?.join(", ") || "",
-      documents_needed: s.documents_needed?.join(", ") || "",
-    });
+  /* ---------------- EDIT ---------------- */
+  const editScholarship = (s) => {
     setEditingId(s.id);
+    const filled = {};
+    Object.keys(SCHOLARSHIP_FIELDS).forEach(k => {
+      filled[k] = Array.isArray(s[k]) ? s[k].join(", ") : s[k] || "";
+    });
+    setFormData(filled);
     setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Delete this scholarship?")) {
-      await supabase.from("scholarships").delete().eq("id", id);
-      fetchScholarships();
-    }
+  /* ---------------- DELETE ---------------- */
+  const deleteScholarship = async (id) => {
+    if (!window.confirm("Delete this scholarship?")) return;
+    await supabase.from("scholarships").delete().eq("id", id);
+    fetchScholarships();
   };
 
-  const resetForm = () => {
-    setForm(emptyForm);
-    setEditingId(null);
-    setShowForm(false);
-  };
+  /* ---------------- FILTERED DATA (NEW) ---------------- */
+  const filteredScholarships = scholarships.filter(s => {
+    const matchesSearch =
+      s.name?.toLowerCase().includes(search.toLowerCase()) ||
+      s.provider?.toLowerCase().includes(search.toLowerCase());
+
+    const matchesType = filters.type ? s.type === filters.type : true;
+    const matchesGender = filters.gender ? s.gender === filters.gender : true;
+    const matchesCategory = filters.category
+      ? Array.isArray(s.category) && s.category.includes(filters.category)
+      : true;
+
+    return matchesSearch && matchesType && matchesGender && matchesCategory;
+  });
 
   /* ---------------- UI ---------------- */
   return (
-    <div className="min-h-screen bg-slate-50 p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">
-              Scholarships Admin
-            </h1>
-            <p className="text-slate-500">
-              Manage all available scholarship opportunities
-            </p>
-          </div>
+    <div className="p-6 bg-gray-50 min-h-screen">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-indigo-700">
+          🎓 Scholarships
+        </h1>
 
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 bg-indigo-600 
-                       text-white px-5 py-2.5 rounded-xl
-                       shadow hover:bg-indigo-700"
-          >
-            <Plus size={18} />
-            Add Scholarship
-          </button>
-        </div>
-
-        {/* Table */}
-        <div className="bg-white rounded-xl shadow overflow-hidden">
-          {loading ? (
-            <div className="p-6 text-center text-gray-500">Loading...</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-slate-100 text-slate-700 sticky top-0">
-                  <tr>
-                    {[
-                      "Name",
-                      "Provider",
-                      "Type",
-                      "Region",
-                      "Amount",
-                      "Deadline",
-                      "Actions",
-                    ].map((h) => (
-                      <th key={h} className="px-4 py-3 font-semibold">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {scholarships.map((s) => (
-                    <tr
-                      key={s.id}
-                      className="border-t hover:bg-slate-50"
-                    >
-                      <td className="px-4 py-3 font-medium">
-                        {s.name}
-                      </td>
-                      <td className="px-4 py-3">{s.provider}</td>
-                      <td className="px-4 py-3">{s.type}</td>
-                      <td className="px-4 py-3">{s.region}</td>
-                      <td className="px-4 py-3">
-                        ₹ {s.amount_benefit}
-                      </td>
-                      <td className="px-4 py-3">{s.deadline}</td>
-                      <td className="px-4 py-3 flex gap-3">
-                        <button
-                          onClick={() => handleEdit(s)}
-                          className="text-indigo-600 hover:text-indigo-800"
-                        >
-                          <Edit size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(s.id)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          <Trash size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        <button
+          onClick={() => {
+            setShowForm(!showForm);
+            setEditingId(null);
+            setFormData(emptyScholarship);
+          }}
+          className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded"
+        >
+          <Plus size={18} />
+          Add Scholarship
+        </button>
       </div>
 
-      {/* Modal */}
+      {/* -------- SEARCH + FILTER BAR (NEW) -------- */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 rounded shadow mb-6">
+        <input
+          type="text"
+          placeholder="🔍 Search scholarships..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border p-2 rounded"
+        />
+
+        <select
+          value={filters.type}
+          onChange={(e) => setFilters({ ...filters, type: e.target.value })}
+          className="border p-2 rounded"
+        >
+          <option value="">All Types</option>
+          <option>Merit Based</option>
+          <option>Means Based</option>
+          <option>Minority</option>
+          <option>Gender Specific</option>
+          <option>Disability</option>
+        </select>
+
+        <select
+          value={filters.gender}
+          onChange={(e) => setFilters({ ...filters, gender: e.target.value })}
+          className="border p-2 rounded"
+        >
+          <option value="">All Genders</option>
+          <option>Female</option>
+          <option>Any</option>
+        </select>
+
+        <select
+          value={filters.category}
+          onChange={(e) =>
+            setFilters({ ...filters, category: e.target.value })
+          }
+          className="border p-2 rounded"
+        >
+          <option value="">All Categories</option>
+          <option>General</option>
+          <option>OBC</option>
+          <option>SC</option>
+          <option>ST</option>
+          <option>Minority</option>
+        </select>
+      </div>
+
+      {/* -------- ADD / EDIT FORM -------- */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold">
-                {editingId ? "Edit Scholarship" : "Add Scholarship"}
-              </h2>
-              <button onClick={resetForm}>
-                <X />
-              </button>
-            </div>
+        <div className="bg-white p-6 rounded shadow mb-8">
+          <h2 className="font-bold mb-4">
+            {editingId ? "✏️ Edit Scholarship" : "➕ Add Scholarship"}
+          </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Object.keys(form).map((key) => (
-                <div key={key} className="flex flex-col gap-1">
-                  <label className="text-sm font-medium text-slate-700">
-                    {key.replace(/_/g, " ")}
-                  </label>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {Object.entries(SCHOLARSHIP_FIELDS).map(([field, type]) => (
+              <input
+                key={field}
+                placeholder={`${field.replace(/_/g, " ")}${
+                  type === "json" ? " (comma separated)" : ""
+                }`}
+                value={formData[field]}
+                onChange={(e) =>
+                  setFormData({ ...formData, [field]: e.target.value })
+                }
+                className="border p-2 rounded"
+              />
+            ))}
+          </div>
 
-                  {key.includes("description") ||
-                  key.includes("eligibility") ? (
-                    <textarea
-                      name={key}
-                      value={form[key]}
-                      onChange={handleChange}
-                      rows={3}
-                      className="border rounded-lg p-2"
-                    />
-                  ) : (
-                    <input
-                      name={key}
-                      value={form[key]}
-                      onChange={handleChange}
-                      className="border rounded-lg p-2"
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={resetForm}
-                className="px-4 py-2 rounded-lg bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                className="px-5 py-2 rounded-lg bg-indigo-600 text-white"
-              >
-                Save
-              </button>
-            </div>
+          <div className="mt-4 flex gap-3">
+            <button
+              onClick={saveScholarship}
+              className="bg-indigo-600 text-white px-6 py-2 rounded"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => setShowForm(false)}
+              className="bg-gray-300 px-6 py-2 rounded"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
+
+      {/* -------- TABLE -------- */}
+      <div className="bg-white rounded shadow">
+        {loading ? (
+          <p className="p-4">Loading...</p>
+        ) : (
+          <table className="w-full text-sm border">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="border p-2">Name</th>
+                <th className="border p-2">Provider</th>
+                <th className="border p-2">Region</th>
+                <th className="border p-2">Amount</th>
+                <th className="border p-2">Deadline</th>
+                <th className="border p-2">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredScholarships.map((s) => (
+                <tr key={s.id}>
+                  <td className="border p-2 font-semibold">{s.name}</td>
+                  <td className="border p-2">{s.provider}</td>
+                  <td className="border p-2">{s.region}</td>
+                  <td className="border p-2">₹ {s.amount_benefit}</td>
+                  <td className="border p-2">{s.deadline}</td>
+                  <td className="border p-2 flex gap-3">
+                    <button onClick={() => editScholarship(s)}>
+                      <Edit size={18} className="text-blue-600" />
+                    </button>
+                    <button onClick={() => deleteScholarship(s.id)}>
+                      <Trash size={18} className="text-red-600" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

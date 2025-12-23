@@ -45,14 +45,9 @@ export default function AdminEBooks() {
 
   const handleSave = async () => {
     if (editingId) {
-      await supabase
-        .from("resource")
-        .update(form)
-        .eq("id", editingId);
+      await supabase.from("resource").update(form).eq("id", editingId);
     } else {
-      await supabase
-        .from("resource")
-        .insert([form]);
+      await supabase.from("resource").insert([form]);
     }
 
     resetForm();
@@ -94,15 +89,73 @@ export default function AdminEBooks() {
             </p>
           </div>
 
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 bg-indigo-600 text-white
-                       px-5 py-2.5 rounded-xl shadow hover:bg-indigo-700"
-          >
-            <Plus size={18} />
-            Add Resource
-          </button>
+          {!showForm && (
+            <button
+              onClick={() => setShowForm(true)}
+              className="flex items-center gap-2 bg-indigo-600 text-white
+                         px-5 py-2.5 rounded-xl shadow hover:bg-indigo-700"
+            >
+              <Plus size={18} />
+              Add Resource
+            </button>
+          )}
         </div>
+
+        {/* FORM (ABOVE TABLE) */}
+        {showForm && (
+          <div className="bg-white rounded-2xl shadow p-6 space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">
+                {editingId ? "Edit Resource" : "Add Resource"}
+              </h2>
+              <button onClick={resetForm}>
+                <X />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Object.keys(form).map((key) => (
+                <div key={key} className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-slate-700 capitalize">
+                    {key.replace(/_/g, " ")}
+                  </label>
+
+                  {key === "description" ? (
+                    <textarea
+                      name={key}
+                      value={form[key]}
+                      onChange={handleChange}
+                      rows={3}
+                      className="border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500"
+                    />
+                  ) : (
+                    <input
+                      name={key}
+                      value={form[key]}
+                      onChange={handleChange}
+                      className="border rounded-lg p-2 focus:ring-2 focus:ring-indigo-500"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={resetForm}
+                className="px-4 py-2 rounded-lg bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                className="px-5 py-2 rounded-lg bg-indigo-600 text-white"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* TABLE */}
         <div className="bg-white rounded-xl shadow overflow-hidden">
@@ -127,7 +180,7 @@ export default function AdminEBooks() {
                   {resources.map((r) => (
                     <tr
                       key={r.id}
-                      className="border-t hover:bg-slate-50 align-top"
+                      className="border-t hover:bg-slate-50"
                     >
                       <td className="px-4 py-3 font-medium">{r.title}</td>
                       <td className="px-4 py-3">{r.subjects}</td>
@@ -169,65 +222,8 @@ export default function AdminEBooks() {
             </div>
           )}
         </div>
+
       </div>
-
-      {/* MODAL */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold">
-                {editingId ? "Edit Resource" : "Add Resource"}
-              </h2>
-              <button onClick={resetForm}>
-                <X />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Object.keys(form).map((key) => (
-                <div key={key} className="flex flex-col gap-1">
-                  <label className="text-sm font-medium text-slate-700">
-                    {key.replace(/_/g, " ")}
-                  </label>
-
-                  {key === "description" ? (
-                    <textarea
-                      name={key}
-                      value={form[key]}
-                      onChange={handleChange}
-                      rows={3}
-                      className="border rounded-lg p-2"
-                    />
-                  ) : (
-                    <input
-                      name={key}
-                      value={form[key]}
-                      onChange={handleChange}
-                      className="border rounded-lg p-2"
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={resetForm}
-                className="px-4 py-2 rounded-lg bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                className="px-5 py-2 rounded-lg bg-indigo-600 text-white"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

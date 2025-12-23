@@ -6,28 +6,26 @@ const AdminQualificationView = ({ initialQualification }) => {
   const [qualification, setQualification] = useState(initialQualification || "10");
   const [items, setItems] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [hoveredId, setHoveredId] = useState(null);
-  
-const [domainsMap, setDomainsMap] = useState({});
-const [degreesMap, setDegreesMap] = useState({});
-  // Filters
+
+  const [domainsMap, setDomainsMap] = useState({});
+  const [degreesMap, setDegreesMap] = useState({});
+  const [search, setSearch] = useState("");
+
+
+  /* ---------------- FILTERS ---------------- */
   const [demandFilter, setDemandFilter] = useState("");
   const [streamFilter, setStreamFilter] = useState("");
   const [careerFilter, setCareerFilter] = useState("");
-
-  // Admin edit/add
-  const [editingItem, setEditingItem] = useState(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editStreams, setEditStreams] = useState([]);
-  const [editCareers, setEditCareers] = useState([""]);
-  const [editDemand, setEditDemand] = useState("demand");
-
-  const [newTitle, setNewTitle] = useState("");
-  const [newStreams, setNewStreams] = useState([]);
-  const [newCareers, setNewCareers] = useState([""]);
-  const [newDemand, setNewDemand] = useState("demand");
   const [degreeFilter, setDegreeFilter] = useState("");
 
+  /* ---------------- FORM STATE ---------------- */
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+
+  const [title, setTitle] = useState("");
+  const [streams, setStreams] = useState([]);
+  const [careers, setCareers] = useState([""]);
+  const [demand, setDemand] = useState("demand");
 
   const streamOptions = [
     "Science",
@@ -48,484 +46,361 @@ const [degreesMap, setDegreesMap] = useState({});
     "Researcher",
   ];
 
-  // ------------------- Fetch Data from Supabase -------------------
-  const fetchData = async (qual) => {
+  /* ---------------- FETCH DOMAIN & DEGREE MAPS ---------------- */
+  useEffect(() => {
+    const fetchMaps = async () => {
+      const { data: domains } = await supabase.from("domains").select("id,name");
+      const { data: degrees } = await supabase.from("degrees").select("id,name");
+
+      const dMap = {};
+      domains?.forEach(d => (dMap[d.id] = d.name));
+      setDomainsMap(dMap);
+
+      const degMap = {};
+      degrees?.forEach(d => (degMap[d.id] = d.name));
+      setDegreesMap(degMap);
+    };
+    fetchMaps();
+  }, []);
+
+  /* ---------------- FETCH COURSES ---------------- */
+  const fetchData = async () => {
     setIsLoading(true);
-    try {
-      let query = supabase.from("courses").select("*");
+    let q = supabase.from("courses").select("*");
 
-      if (qual === "10") query = query.eq("qualification", "10th");
-      else query = query.eq("qualification", "12th");
+    q =
+      qualification === "10"
+        ? q.eq("qualification", "10th")
+        : q.eq("qualification", "12th");
 
-      const { data, error } = await query;
+    const { data } = await q;
 
-      if (error) {
-        console.error("Error fetching courses:", error);
-        setItems([]);
-      } else {
-        const mapped = data.map((row) => ({
-  id: row.id,
-  title: row.course_title,
-  streams: row.domain_id ? [domainsMap[row.domain_id] || "N/A"] : [],
-  stream: row.domain_id ? domainsMap[row.domain_id] || "N/A" : "N/A",
-  degree: row.degree_id ? degreesMap[row.degree_id] || "N/A" : "N/A",
-  careers: row.careers ? row.careers.split(",") : [],
-  demand: row.demand === true || row.demand === "TRUE" ? "demand" : "not in demand",
-}));
+    const mapped =
+      data?.map(row => ({
+        id: row.id,
+        title: row.course_title,
+        stream: row.domain_id ? domainsMap[row.domain_id] : "N/A",
+        streams: row.domain_id ? [domainsMap[row.domain_id]] : [],
+        degree: row.degree_id ? degreesMap[row.degree_id] : "N/A",
+        careers: row.careers ? row.careers.split(",") : [],
+        demand: row.demand ? "demand" : "not in demand",
+      })) || [];
 
-        setItems(mapped);
-      }
-    } catch (err) {
-      console.error("Fetch courses failed:", err);
-      setItems([]);
-    } finally {
-      setIsLoading(false);
-    }
+    setItems(mapped);
+    setIsLoading(false);
   };
 
   useEffect(() => {
-  const fetchMappings = async () => {
-    try {
-      const { data: domainsData } = await supabase.from("domains").select("id,name");
-      const { data: degreesData } = await supabase.from("degrees").select("id,name");
+    fetchData();
+  }, [qualification, domainsMap, degreesMap]);
 
-      const domainObj = {};
-      domainsData?.forEach(d => (domainObj[d.id] = d.name));
-      setDomainsMap(domainObj);
+  /* ---------------- FILTERED DATA ---------------- */
+  const filteredData = items.filter(i => {
+  if (
+    search &&
+    !i.title.toLowerCase().includes(search.toLowerCase())
+  )
+    return false;
 
-      const degreeObj = {};
-      degreesData?.forEach(d => (degreeObj[d.id] = d.name));
-      setDegreesMap(degreeObj);
-    } catch (err) {
-      console.error("Error fetching mappings:", err);
-    }
-  };
-  fetchMappings();
-}, []);
+  if (qualification === "12" && demandFilter && i.demand !== demandFilter)
+    return false;
+  if (streamFilter && i.stream !== streamFilter) return false;
+  if (degreeFilter && i.degree !== degreeFilter) return false;
+  if (careerFilter && !i.careers.includes(careerFilter)) return false;
 
-  useEffect(() => {
-    fetchData(qualification);
-  }, [qualification]);
-
-  // ------------------- Filtered Data -------------------
-  const filteredData = items.filter((item) => {
-  let match = true;
-
-  if (qualification === "12" && demandFilter)
-    match = match && item.demand === demandFilter;
-
-  if (streamFilter) match = match && item.stream === streamFilter;
-
-  if (careerFilter)
-    match =
-      match &&
-      (item.careers ? item.careers.includes(careerFilter) : false);
-
-  if (degreeFilter)
-    match = match && item.degree === degreeFilter;
-
-  return match;
+  return true;
 });
 
 
-  // ------------------- Admin Handlers -------------------
-  const handleAddCareerField = (setCareers) => setCareers((prev) => [...prev, ""]);
-
-  const handleStreamToggle = (stream, setStreams) => {
-    setStreams((prev) =>
-      prev.includes(stream) ? prev.filter((s) => s !== stream) : [...prev, stream]
+  /* ---------------- HELPERS ---------------- */
+  const toggleStream = (s) =>
+    setStreams(prev =>
+      prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
     );
+
+  const addCareerField = () => setCareers(prev => [...prev, ""]);
+
+  const resetForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setTitle("");
+    setStreams([]);
+    setCareers([""]);
+    setDemand("demand");
   };
 
-  const handleSaveEdit = () => {
-    setItems((prev) =>
-      prev.map((i) =>
-        i.id === editingItem
-          ? {
-              ...i,
-              title: editTitle,
-              streams: qualification === "10" ? editStreams : undefined,
-              stream: qualification === "12" ? editStreams[0] : undefined,
-              careers: editCareers.filter((c) => c.trim() !== ""),
-              demand: qualification === "12" ? editDemand : undefined,
-            }
-          : i
-      )
-    );
-    setEditingItem(null);
+  /* ---------------- SAVE ---------------- */
+  const handleSave = () => {
+    if (!title.trim()) return;
+
+    if (editingId) {
+      setItems(prev =>
+        prev.map(i =>
+          i.id === editingId
+            ? {
+                ...i,
+                title,
+                streams: qualification === "10" ? streams : i.streams,
+                stream: qualification === "12" ? streams[0] : i.stream,
+                careers: careers.filter(c => c.trim()),
+                demand: qualification === "12" ? demand : i.demand,
+              }
+            : i
+        )
+      );
+    } else {
+      setItems(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          title,
+          streams: qualification === "10" ? streams : [],
+          stream: qualification === "12" ? streams[0] : "",
+          careers: careers.filter(c => c.trim()),
+          demand: qualification === "12" ? demand : undefined,
+        },
+      ]);
+    }
+    resetForm();
   };
 
-  const handleCancelEdit = () => setEditingItem(null);
+  /* ---------------- DELETE ---------------- */
+  const handleDelete = (id) =>
+    setItems(prev => prev.filter(i => i.id !== id));
 
-  const handleDelete = (id) => setItems((prev) => prev.filter((i) => i.id !== id));
-
-  const handleAddNew = () => {
-    if (!newTitle.trim()) return;
-    setItems((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        title: newTitle,
-        streams: qualification === "10" ? newStreams : undefined,
-        stream: qualification === "12" ? newStreams[0] : undefined,
-        careers: newCareers.filter((c) => c.trim() !== ""),
-        demand: qualification === "12" ? newDemand : undefined,
-      },
-    ]);
-    setNewTitle("");
-    setNewStreams([]);
-    setNewCareers([""]);
-    setNewDemand("demand");
-  };
-
-  // ------------------- Render -------------------
+  /* ---------------- UI ---------------- */
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-indigo-50 via-white to-blue-50">
-      <header className="text-center py-16 bg-gradient-to-r from-indigo-600 to-blue-500 text-white shadow-lg">
-        <h1 className="text-4xl md:text-5xl font-extrabold mb-3">
-          <span className="animate-bounce inline-block">🎯</span>{" "}
-          {qualification === "10" ? "10th Subjects" : "12th Courses"} Admin
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-blue-50 p-6">
+
+      {/* HEADER */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-indigo-700">
+          {qualification === "10" ? "10th Subjects" : "12th Courses"}
         </h1>
-        <p className="text-lg opacity-90 max-w-2xl mx-auto">
-          Manage subjects and courses: add, edit, delete.
-        </p>
-      </header>
 
-      {/* Qualification Toggle */}
-      <div className="flex justify-center mt-10">
-        <div className="bg-white/90 backdrop-blur-md rounded-full shadow-lg flex p-2 space-x-4">
-          <button
-            onClick={() => setQualification("10")}
-            className={`px-6 py-2 rounded-full font-medium transition ${
-              qualification === "10"
-                ? "bg-indigo-600 text-white shadow-md"
-                : "text-gray-700 hover:bg-gray-100"
-            }`}
-          >
-            10th
-          </button>
-          <button
-            onClick={() => setQualification("12")}
-            className={`px-6 py-2 rounded-full font-medium transition ${
-              qualification === "12"
-                ? "bg-indigo-600 text-white shadow-md"
-                : "text-gray-700 hover:bg-gray-100"
-            }`}
-          >
-            12th
-          </button>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="sticky top-2 z-30 flex justify-center mt-10 px-6 space-x-6">
-        {qualification === "12" && (
-          <select
-            value={demandFilter}
-            onChange={(e) => setDemandFilter(e.target.value)}
-            className="px-4 py-2 rounded-xl border shadow-sm bg-white/90 backdrop-blur text-gray-700"
-          >
-            <option value="">All</option>
-            <option value="demand">Demand</option>
-            <option value="not in demand">Not in Demand</option>
-          </select>
-        )}
-        
-        <select
-          value={streamFilter}
-          onChange={(e) => setStreamFilter(e.target.value)}
-          className="px-4 py-2 rounded-xl border shadow-sm bg-white/90 backdrop-blur text-gray-700"
-        >
-          <option value="">All Streams</option>
-          {streamOptions.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-         {qualification === "12" && (
-          <select
-  value={degreeFilter}
-  onChange={(e) => setDegreeFilter(e.target.value)}
-  className="px-4 py-2 rounded-xl border shadow-sm bg-white/90 backdrop-blur text-gray-700"
->
-  <option value="">All Degrees</option>
-  {Object.values(degreesMap).map((d) => (
-    <option key={d} value={d}>
-      {d}
-    </option>
-  ))}
-</select>
-
-         )}
-        <select
-          value={careerFilter}
-          onChange={(e) => setCareerFilter(e.target.value)}
-          className="px-4 py-2 rounded-xl border shadow-sm bg-white/90 backdrop-blur text-gray-700"
-        >
-          <option value="">All Careers</option>
-          {careerOptions.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-      </div>
-      
-
-      {/* Add New Item */}
-      <div className="bg-white rounded-2xl p-6 mt-8 mx-6 shadow-md">
-        <h3 className="font-semibold text-lg mb-4 text-gray-800">
-          Add New {qualification === "10" ? "Subject" : "Course"}
-        </h3>
-        <input
-          type="text"
-          placeholder="Title"
-          value={newTitle}
-          onChange={(e) => setNewTitle(e.target.value)}
-          className="w-full mb-2 p-2 border rounded"
-        />
-        {qualification === "10" ? (
-          <div className="mb-2">
-            <label className="font-medium text-sm text-gray-700">Select Domains:</label>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {streamOptions.map((s) => (
-                <label key={s} className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={newStreams.includes(s)}
-                    onChange={() => handleStreamToggle(s, setNewStreams)}
-                  />
-                  <span>{s}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <select
-            value={newStreams[0] || ""}
-            onChange={(e) => setNewStreams([e.target.value])}
-            className="w-full mb-2 p-2 border rounded"
-          >
-            <option value="">Select Domains</option>
-            {streamOptions.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        )}
-        {qualification === "12" && (
-          <select
-            value={newDemand}
-            onChange={(e) => setNewDemand(e.target.value)}
-            className="w-full mb-2 p-2 border rounded"
-          >
-            <option value="demand">Demand</option>
-            <option value="not in demand">Not in Demand</option>
-          </select>
-        )}
-        {newCareers.map((c, idx) => (
-          <input
-            key={idx}
-            type="text"
-            placeholder={`Career ${idx + 1}`}
-            value={c}
-            onChange={(e) => {
-              const arr = [...newCareers];
-              arr[idx] = e.target.value;
-              setNewCareers(arr);
-            }}
-            className="w-full mb-2 p-2 border rounded"
-          />
-        ))}
         <button
-          onClick={() => handleAddCareerField(setNewCareers)}
-          className="text-blue-600 mb-4 font-semibold hover:underline"
+          onClick={() => setShowForm(true)}
+          className="bg-green-600 text-white px-4 py-2 rounded"
         >
-          + Add Career
+          ➕ Add {qualification === "10" ? "Subject" : "Course"}
         </button>
-        <div>
-          <button
-            onClick={handleAddNew}
-            className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
-          >
-            Add {qualification === "10" ? "Subject" : "Course"}
-          </button>
-        </div>
       </div>
 
-      {/* Items List */}
-      <main className="flex-1 px-6 md:px-12 lg:px-20 py-12">
-        {isLoading ? (
-          <div className="text-center text-gray-500 animate-pulse">Loading...</div>
-        ) : filteredData.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 items-start">
-            {filteredData.map((item) => (
-              <div
-                key={item.id}
-                onMouseEnter={() => setHoveredId(item.id)}
-                onMouseLeave={() => setHoveredId(null)}
-                className="relative bg-white/90 backdrop-blur-md rounded-2xl p-6 shadow transition transform cursor-pointer border border-gray-100 flex flex-col justify-start"
-              >
-                {editingItem === item.id ? (
-                  <div className="space-y-2">
+     {/* -------- SEARCH + TOGGLE + FILTER BAR -------- */}
+<div className="bg-white p-4 rounded shadow mb-6">
+  <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
+
+    {/* SEARCH */}
+    <input
+      type="text"
+      placeholder="🔍 Search subject / course"
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      className="border p-2 rounded md:col-span-2"
+    />
+
+    {/* 10th / 12th TOGGLE */}
+    <div className="flex gap-2">
+      {["10", "12"].map(q => (
+        <button
+          key={q}
+          onClick={() => setQualification(q)}
+          className={`px-4 py-2 rounded w-full ${
+            qualification === q
+              ? "bg-indigo-600 text-white"
+              : "bg-gray-100"
+          }`}
+        >
+          {q}th
+        </button>
+      ))}
+    </div>
+
+    {/* DEMAND (12th ONLY) */}
+    {qualification === "12" && (
+      <select
+        value={demandFilter}
+        onChange={(e) => setDemandFilter(e.target.value)}
+        className="border p-2 rounded"
+      >
+        <option value="">All Demand</option>
+        <option value="demand">Demand</option>
+        <option value="not in demand">Not in Demand</option>
+      </select>
+    )}
+
+    {/* STREAM */}
+    <select
+      value={streamFilter}
+      onChange={(e) => setStreamFilter(e.target.value)}
+      className="border p-2 rounded"
+    >
+      <option value="">All Streams</option>
+      {streamOptions.map(s => (
+        <option key={s}>{s}</option>
+      ))}
+    </select>
+
+    {/* CAREER */}
+    <select
+      value={careerFilter}
+      onChange={(e) => setCareerFilter(e.target.value)}
+      className="border p-2 rounded"
+    >
+      <option value="">All Careers</option>
+      {careerOptions.map(c => (
+        <option key={c}>{c}</option>
+      ))}
+    </select>
+
+  </div>
+</div>
+
+
+      {/* ---------------- FORM (ABOVE LIST) ---------------- */}
+      {showForm && (
+        <div className="bg-white p-6 rounded shadow mb-8">
+          <h2 className="font-bold mb-4">
+            {editingId ? "✏️ Edit" : "➕ Add"}{" "}
+            {qualification === "10" ? "Subject" : "Course"}
+          </h2>
+
+          <input
+            placeholder="Title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full mb-3 border p-2 rounded"
+          />
+
+          {qualification === "10" ? (
+            <div className="mb-3">
+              <label className="font-medium">Domains</label>
+              <div className="flex flex-wrap gap-3 mt-2">
+                {streamOptions.map(s => (
+                  <label key={s} className="flex items-center gap-2">
                     <input
-                      type="text"
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      className="w-full p-2 border rounded"
+                      type="checkbox"
+                      checked={streams.includes(s)}
+                      onChange={() => toggleStream(s)}
                     />
-                    {qualification === "10" ? (
-                      <div>
-                        <label className="font-medium text-sm text-gray-700">
-                          Select Domains:
-                        </label>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {streamOptions.map((s) => (
-                            <label key={s} className="flex items-center space-x-2">
-                              <input
-                                type="checkbox"
-                                checked={editStreams.includes(s)}
-                                onChange={() => handleStreamToggle(s, setEditStreams)}
-                              />
-                              <span>{s}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <select
-                        value={editStreams[0] || ""}
-                        onChange={(e) => setEditStreams([e.target.value])}
-                        className="w-full p-2 border rounded"
-                      >
-                        <option value="">Select Domains</option>
-                        {streamOptions.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                    {qualification === "12" && (
-                      <select
-                        value={editDemand}
-                        onChange={(e) => setEditDemand(e.target.value)}
-                        className="w-full p-2 border rounded"
-                      >
-                        <option value="demand">Demand</option>
-                        <option value="not in demand">Not in Demand</option>
-                      </select>
-                    )}
-                    
-                    {editCareers.map((c, idx) => (
-                      <input
-                        key={idx}
-                        type="text"
-                        value={c}
-                        onChange={(e) => {
-                          const arr = [...editCareers];
-                          arr[idx] = e.target.value;
-                          setEditCareers(arr);
-                        }}
-                        className="w-full p-2 border rounded"
-                      />
-                    ))}
-                    <button
-                      onClick={() => handleAddCareerField(setEditCareers)}
-                      className="text-blue-600 font-semibold hover:underline mb-4"
-                    >
-                      + Add Career
-                    </button>
-                    <div className="flex space-x-2 mt-2">
-                      <button
-                        onClick={handleSaveEdit}
-                        className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={handleCancelEdit}
-                        className="bg-gray-300 text-gray-800 px-4 py-1 rounded hover:bg-gray-400"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {qualification === "12" && item.demand === "demand" && (
-                      <span className="absolute top-4 right-4 px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700">
-                        ✅ Demand
-                      </span>
-                    )}
-                    {qualification === "12" && item.demand === "not in demand" && (
-                      <span className="absolute top-4 right-4 px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-700">
-                        ❌ Not in Demand
-                      </span>
-                    )}
-                    <h4 className="font-bold text-lg text-gray-800 flex items-center gap-2">
-                      <BookOpen className="w-5 h-5 text-indigo-600" />
-                      {item.title}
-                    </h4>
-                    <p className="text-sm text-gray-500">
-                      Domain:{" "}
-                      {qualification === "10"
-                        ? item.streams?.join(", ") || "N/A"
-                        : item.stream || "N/A"} 
-
-                    </p>
-                    <div className="overflow-hidden transition-all duration-500 ease-in-out">
-                      <h5 className="font-semibold text-gray-700 mb-1">Possible Careers:</h5>
-                      {item.careers && item.careers.length > 0 ? (
-                        <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-                          {item.careers.map((c, idx) => (
-                            <li key={idx}>{c}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-sm text-gray-500 italic">No careers info</p>
-                      )}
-                    </div>
-                    <div className="flex space-x-2 mt-2">
-                      <button
-                        onClick={() => {
-                          setEditingItem(item.id);
-                          setEditTitle(item.title);
-                          setEditStreams(
-                            qualification === "10" ? item.streams || [] : [item.stream] || []
-                          );
-                          setEditCareers(item.careers || [""]);
-                          setEditDemand(item.demand || "demand");
-                        }}
-                        className="bg-yellow-400 text-white px-4 py-1 rounded hover:bg-yellow-500"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="bg-red-500 text-white px-4 py-1 rounded hover:bg-red-600"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </>
-                )}
+                    {s}
+                  </label>
+                ))}
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center text-gray-500 mt-10">
-            <TrendingUp className="mx-auto w-12 h-12 text-gray-400 mb-3" />
-            No subjects/courses found.
-          </div>
-        )}
-      </main>
+            </div>
+          ) : (
+            <select
+              value={streams[0] || ""}
+              onChange={(e) => setStreams([e.target.value])}
+              className="w-full mb-3 border p-2 rounded"
+            >
+              <option value="">Select Domain</option>
+              {streamOptions.map(s => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+          )}
 
-      <footer className="bg-gray-100 text-gray-600 text-center py-6 mt-auto border-t">
-        © 2025 Career Admin Panel • Manage Qualifications
-      </footer>
+          {qualification === "12" && (
+            <select
+              value={demand}
+              onChange={(e) => setDemand(e.target.value)}
+              className="w-full mb-3 border p-2 rounded"
+            >
+              <option value="demand">Demand</option>
+              <option value="not in demand">Not in Demand</option>
+            </select>
+          )}
+
+          {careers.map((c, i) => (
+            <input
+              key={i}
+              placeholder={`Career ${i + 1}`}
+              value={c}
+              onChange={(e) => {
+                const arr = [...careers];
+                arr[i] = e.target.value;
+                setCareers(arr);
+              }}
+              className="w-full mb-2 border p-2 rounded"
+            />
+          ))}
+
+          <button
+            onClick={addCareerField}
+            className="text-blue-600 font-semibold mb-4"
+          >
+            + Add Career
+          </button>
+
+          <div className="flex gap-3">
+            <button
+              onClick={handleSave}
+              className="bg-indigo-600 text-white px-6 py-2 rounded"
+            >
+              Save
+            </button>
+            <button
+              onClick={resetForm}
+              className="bg-gray-300 px-6 py-2 rounded"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+     
+
+      {/* ---------------- LIST ---------------- */}
+      {isLoading ? (
+        <p>Loading...</p>
+      ) : filteredData.length ? (
+        <div className="grid md:grid-cols-3 gap-6">
+          {filteredData.map(i => (
+            <div key={i.id} className="bg-white p-6 rounded shadow">
+              <h4 className="font-bold flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-indigo-600" />
+                {i.title}
+              </h4>
+              <p className="text-sm">Domain: {i.stream}</p>
+              <ul className="list-disc ml-5 mt-2">
+                {i.careers.map((c, idx) => (
+                  <li key={idx}>{c}</li>
+                ))}
+              </ul>
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={() => {
+                    setEditingId(i.id);
+                    setTitle(i.title);
+                    setStreams(
+                      qualification === "10" ? i.streams : [i.stream]
+                    );
+                    setCareers(i.careers || [""]);
+                    setDemand(i.demand || "demand");
+                    setShowForm(true);
+                  }}
+                  className="bg-yellow-400 px-4 py-1 rounded text-white"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleDelete(i.id)}
+                  className="bg-red-500 px-4 py-1 rounded text-white"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center text-gray-500 mt-10">
+          <TrendingUp className="mx-auto mb-2" />
+          No data found
+        </div>
+      )}
     </div>
   );
 };

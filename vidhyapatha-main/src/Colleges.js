@@ -1,292 +1,298 @@
-import React, { useState } from "react";
-import { Edit, Trash2, Upload } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { supabase } from "./supabase";
+import { Pencil, Trash2, Plus } from "lucide-react";
+
+/* ---------------- COLLEGE SCHEMA ---------------- */
+const COLLEGE_FIELDS = {
+  name: "text",
+  rank: "text",
+  type: "text",
+  address: "text",
+  state: "text",
+  district: "text",
+  stream: "json",
+  degrees: "json",
+  medium: "text",
+  eligible: "text",
+  duration: "text",
+  admission_mode: "text",
+  fees: "text",
+  hostel: "text",
+  lab: "text",
+  lib: "text",
+  net: "text",
+  food: "text",
+  transport: "text",
+  sports: "text",
+  placements: "text",
+  career: "text",
+  alumni: "text",
+  clubs: "text",
+  rating: "text",
+  cutoff: "json",
+  gender: "text",
+  website: "text",
+};
+
+const emptyCollege = Object.keys(COLLEGE_FIELDS).reduce((a, k) => {
+  a[k] = "";
+  return a;
+}, {});
 
 export default function AdminColleges() {
-  const [colleges, setColleges] = useState([
-    {
-      name: "Indian Institute of Technology Jammu (IIT Jammu)",
-      district: "Jammu",
-      stream: "Engineering",
-      medium: "English",
-      details: {
-        Rank: "56 (NIRF 2025 Engineering Overall)",
-        Type: "Central Government Institute (IIT)",
-        Address: "Jagti, NH-44, PO Nagrota, Jammu, Jammu & Kashmir - 181221",
-        Contact: ["0191-274-1103", "0191-123-4567"],
-        Email: ["registrar@iitjammu.ac.in", "info@iitjammu.ac.in"],
-        Courses: ["B.Tech", "M.Tech", "M.Sc", "PhD"],
-        "Cut-Off": "JEE Advanced rank-based",
-        Facilities: ["Hostel", "Library", "WiFi", "Labs", "Sports"],
-        Placement: [
-          "70.8% (2023)",
-          "Highest: INR 53 LPA",
-          "Avg: INR 15.5 LPA",
-        ],
-      },
-      image:
-        "https://upload.wikimedia.org/wikipedia/commons/5/59/IIT_Jammu_Campus.jpg",
-    },
-  ]);
+  const [colleges, setColleges] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
-  const [editingIndex, setEditingIndex] = useState(null);
-  const [newCollege, setNewCollege] = useState(getEmptyCollege());
 
-  function getEmptyCollege() {
-    return {
-      name: "",
-      district: "",
-      stream: "",
-      medium: "",
-      details: {
-        Rank: "",
-        Type: "",
-        Address: "",
-        Contact: "",
-        Email: "",
-        Courses: "",
-        "Cut-Off": "",
-        Facilities: "",
-        Placement: "",
-      },
-      image: "",
-    };
-  }
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [formData, setFormData] = useState(emptyCollege);
 
-  // Handle basic field updates
-  const handleChange = (field, value) => {
-    setNewCollege((prev) => ({ ...prev, [field]: value }));
-  };
+  /* -------- FILTERS -------- */
+  const [filters, setFilters] = useState({
+    state: "",
+    district: "",
+    stream: "",
+    medium: "",
+  });
 
-  // Handle detail updates (keep as string while typing)
-  const handleDetailChange = (key, value) => {
-    setNewCollege((prev) => ({
-      ...prev,
-      details: { ...prev.details, [key]: value },
-    }));
-  };
+  const [options, setOptions] = useState({
+    states: [],
+    districts: [],
+    streams: [],
+    mediums: [],
+  });
 
-  // Image upload (local preview)
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setNewCollege((prev) => ({ ...prev, image: url }));
-    }
-  };
+  /* ---------------- LOAD FILTER OPTIONS ---------------- */
+  useEffect(() => {
+    supabase
+      .from("colleges")
+      .select("state,district,medium,stream")
+      .then(({ data }) => {
+        if (!data) return;
+        setOptions({
+          states: [...new Set(data.map(d => d.state).filter(Boolean))],
+          districts: [...new Set(data.map(d => d.district).filter(Boolean))],
+          mediums: [...new Set(data.map(d => d.medium).filter(Boolean))],
+          streams: [...new Set(data.flatMap(d => d.stream || []))],
+        });
+      });
+  }, []);
 
-  // Save college (Add or Update)
-  const handleSave = () => {
-    const multiFields = ["Contact", "Email", "Courses", "Facilities", "Placement"];
+  /* ---------------- FETCH COLLEGES ---------------- */
+  const fetchColleges = async () => {
+  setLoading(true);
 
-    const formattedDetails = { ...newCollege.details };
-    multiFields.forEach((field) => {
-      if (typeof formattedDetails[field] === "string") {
-        formattedDetails[field] = formattedDetails[field]
-          .split(",")
-          .map((item) => item.trim())
-          .filter((item) => item.length > 0);
-      }
+  let q = supabase.from("colleges").select("*");
+
+  if (filters.state) q = q.eq("state", filters.state);
+  if (filters.district) q = q.eq("district", filters.district);
+  if (filters.medium) q = q.eq("medium", filters.medium);
+  if (filters.stream) q = q.contains("stream", [filters.stream]);
+
+  if (search) q = q.ilike("name", `%${search}%`);
+
+  const { data } = await q;
+  setColleges(data || []);
+  setLoading(false);
+};
+
+
+  useEffect(() => {
+  fetchColleges();
+}, [filters, search]);
+
+
+  /* ---------------- SAVE (ADD / EDIT) ---------------- */
+  const saveCollege = async () => {
+    const payload = {};
+    Object.entries(COLLEGE_FIELDS).forEach(([k, t]) => {
+      payload[k] =
+        t === "json"
+          ? formData[k].split(",").map(v => v.trim()).filter(Boolean)
+          : formData[k];
     });
 
-    const finalCollege = { ...newCollege, details: formattedDetails };
+    const query = editingId
+      ? supabase.from("colleges").update(payload).eq("id", editingId)
+      : supabase.from("colleges").insert(payload);
 
-    if (editingIndex !== null) {
-      const updated = [...colleges];
-      updated[editingIndex] = finalCollege;
-      setColleges(updated);
-    } else {
-      setColleges([...colleges, finalCollege]);
+    const { error } = await query;
+    if (error) {
+      alert("Save failed");
+      console.error(error);
+      return;
     }
 
-    setEditingIndex(null);
-    setNewCollege(getEmptyCollege());
+    setShowForm(false);
+    setEditingId(null);
+    setFormData(emptyCollege);
+    fetchColleges();
   };
 
-  // Edit college
-  const handleEdit = (index) => {
-    const selected = colleges[index];
-    const multiFields = ["Contact", "Email", "Courses", "Facilities", "Placement"];
-
-    const editableDetails = { ...selected.details };
-    multiFields.forEach((field) => {
-      if (Array.isArray(editableDetails[field])) {
-        editableDetails[field] = editableDetails[field].join(", ");
-      }
+  /* ---------------- EDIT ---------------- */
+  const editCollege = (college) => {
+    setEditingId(college.id);
+    const filled = {};
+    Object.keys(COLLEGE_FIELDS).forEach(k => {
+      filled[k] = Array.isArray(college[k]) ? college[k].join(", ") : college[k] || "";
     });
-
-    setEditingIndex(index);
-    setNewCollege({ ...selected, details: editableDetails });
+    setFormData(filled);
+    setShowForm(true);
   };
 
-  // Delete college
-  const handleDelete = (index) => {
-    setColleges(colleges.filter((_, i) => i !== index));
+  /* ---------------- DELETE ---------------- */
+  const deleteCollege = async (id) => {
+    if (!window.confirm("Delete this college?")) return;
+    await supabase.from("colleges").delete().eq("id", id);
+    fetchColleges();
   };
 
-  // Helper to render array or string
-  const renderValue = (value) => {
-    if (Array.isArray(value)) {
-      return (
-        <ul className="list-disc list-inside text-left">
-          {value.map((v, i) => (
-            <li key={i}>{v}</li>
-          ))}
-        </ul>
-      );
-    }
-    return <span>{value}</span>;
-  };
-
+  /* ---------------- UI ---------------- */
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      {/* Header */}
-      <header className="mb-6 text-center">
-        <h1 className="text-3xl font-bold text-indigo-700">
-          🎓 Admin - Manage Colleges
-        </h1>
-        <p className="text-gray-600">Add, edit, or remove colleges</p>
-      </header>
-
-      {/* Form */}
-      <div className="bg-white p-6 rounded-lg shadow mb-8">
-        <h2 className="text-xl font-semibold mb-4">
-          {editingIndex !== null ? "Edit College" : "Add New College"}
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input
-            type="text"
-            placeholder="College Name"
-            value={newCollege.name}
-            onChange={(e) => handleChange("name", e.target.value)}
-            className="p-2 border rounded"
-          />
-          <input
-            type="text"
-            placeholder="District"
-            value={newCollege.district}
-            onChange={(e) => handleChange("district", e.target.value)}
-            className="p-2 border rounded"
-          />
-          <input
-            type="text"
-            placeholder="Stream"
-            value={newCollege.stream}
-            onChange={(e) => handleChange("stream", e.target.value)}
-            className="p-2 border rounded"
-          />
-          <input
-            type="text"
-            placeholder="Medium"
-            value={newCollege.medium}
-            onChange={(e) => handleChange("medium", e.target.value)}
-            className="p-2 border rounded"
-          />
-
-          {/* Details */}
-          {Object.keys(newCollege.details).map((key) => (
-            <input
-              key={key}
-              type="text"
-              placeholder={`${key} ${
-                ["Contact", "Email", "Courses", "Facilities", "Placement"].includes(key)
-                  ? "(comma separated)"
-                  : ""
-              }`}
-              value={newCollege.details[key]}
-              onChange={(e) => handleDetailChange(key, e.target.value)}
-              className="p-2 border rounded col-span-2"
-            />
-          ))}
-
-          {/* Image Upload */}
-          <div className="col-span-2">
-            <button
-              onClick={() => document.getElementById("fileUpload").click()}
-              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded shadow hover:bg-indigo-700"
-            >
-              <Upload className="w-5 h-5" />
-              Upload College Image
-            </button>
-            <input
-              id="fileUpload"
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleImageUpload}
-            />
-            {newCollege.image && (
-              <img
-                src={newCollege.image}
-                alt="Preview"
-                className="mt-2 w-48 h-32 object-cover rounded"
-              />
-            )}
-          </div>
-        </div>
-
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-indigo-700">🎓 Colleges</h1>
         <button
-          onClick={handleSave}
-          className="mt-4 bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700"
+          onClick={() => {
+            setShowForm(!showForm);
+            setEditingId(null);
+            setFormData(emptyCollege);
+          }}
+          className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded"
         >
-          {editingIndex !== null ? "Update College" : "Add College"}
+          <Plus size={18} /> Add College
         </button>
       </div>
 
-      {/* Colleges List */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h2 className="text-xl font-semibold mb-4">All Colleges</h2>
-        <table className="min-w-full border border-gray-200 text-sm">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="border px-4 py-2">Image</th>
-              <th className="border px-4 py-2">Name</th>
-              <th className="border px-4 py-2">District</th>
-              <th className="border px-4 py-2">Stream</th>
-              <th className="border px-4 py-2">Details</th>
-              <th className="border px-4 py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {colleges.map((college, i) => (
-              <tr key={i} className="text-center align-top">
-                <td className="border px-4 py-2">
-                  <img
-                    src={college.image}
-                    alt={college.name}
-                    className="w-16 h-12 object-cover rounded"
-                  />
-                </td>
-                <td className="border px-4 py-2 font-semibold text-indigo-700">
-                  {college.name}
-                </td>
-                <td className="border px-4 py-2">{college.district}</td>
-                <td className="border px-4 py-2">{college.stream}</td>
-                <td className="border px-4 py-2 text-left">
-                  {Object.entries(college.details).map(([key, value]) => (
-                    <div key={key}>
-                      <strong>{key}: </strong>
-                      {renderValue(value)}
-                    </div>
-                  ))}
-                </td>
-                <td className="border px-4 py-2 space-x-2">
-                  <button
-                    onClick={() => handleEdit(i)}
-                    className="bg-yellow-400 hover:bg-yellow-500 text-white px-2 py-1 rounded"
-                  >
-                    <Edit className="w-4 h-4 inline" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(i)}
-                    className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded"
-                  >
-                    <Trash2 className="w-4 h-4 inline" />
-                  </button>
-                </td>
-              </tr>
+      {/* -------- ADD / EDIT FORM -------- */}
+      {showForm && (
+        <div className="bg-white p-6 rounded shadow mb-8">
+          <h2 className="font-bold mb-4">
+            {editingId ? "✏️ Edit College" : "➕ Add College"}
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {Object.entries(COLLEGE_FIELDS).map(([field, type]) => (
+              <input
+                key={field}
+                placeholder={`${field}${type === "json" ? " (comma separated)" : ""}`}
+                value={formData[field]}
+                onChange={(e) =>
+                  setFormData({ ...formData, [field]: e.target.value })
+                }
+                className="border p-2 rounded"
+              />
             ))}
-          </tbody>
-        </table>
+          </div>
+
+          <div className="mt-4 flex gap-3">
+            <button
+              onClick={saveCollege}
+              className="bg-indigo-600 text-white px-6 py-2 rounded"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => setShowForm(false)}
+              className="bg-gray-300 px-6 py-2 rounded"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* -------- FILTERS -------- */}
+<div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-white p-4 rounded shadow mb-6">
+
+  {/* SEARCH BAR */}
+  <input
+    type="text"
+    placeholder="🔍 Search college name"
+    value={search}
+    onChange={(e) => setSearch(e.target.value)}
+    className="border p-2 rounded md:col-span-1"
+  />
+
+  {/* STATE */}
+  <select
+    value={filters.state}
+    onChange={(e) => setFilters({ ...filters, state: e.target.value })}
+    className="border p-2 rounded"
+  >
+    <option value="">All state</option>
+    {options.states.map(v => <option key={v}>{v}</option>)}
+  </select>
+
+  {/* DISTRICT */}
+  <select
+    value={filters.district}
+    onChange={(e) => setFilters({ ...filters, district: e.target.value })}
+    className="border p-2 rounded"
+  >
+    <option value="">All district</option>
+    {options.districts.map(v => <option key={v}>{v}</option>)}
+  </select>
+
+  {/* MEDIUM */}
+  <select
+    value={filters.medium}
+    onChange={(e) => setFilters({ ...filters, medium: e.target.value })}
+    className="border p-2 rounded"
+  >
+    <option value="">All medium</option>
+    {options.mediums.map(v => <option key={v}>{v}</option>)}
+  </select>
+
+  {/* STREAM */}
+  <select
+    value={filters.stream}
+    onChange={(e) => setFilters({ ...filters, stream: e.target.value })}
+    className="border p-2 rounded"
+  >
+    <option value="">All stream</option>
+    {options.streams.map(v => <option key={v}>{v}</option>)}
+  </select>
+</div>
+
+
+      {/* -------- TABLE -------- */}
+      <div className="bg-white rounded shadow">
+        {loading ? (
+          <p className="p-4">Loading...</p>
+        ) : (
+          <table className="w-full text-sm border">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="border p-2">Name</th>
+                <th className="border p-2">State</th>
+                <th className="border p-2">District</th>
+                <th className="border p-2">Stream</th>
+                <th className="border p-2">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {colleges.map(c => (
+                <tr key={c.id}>
+                  <td className="border p-2 font-semibold">{c.name}</td>
+                  <td className="border p-2">{c.state}</td>
+                  <td className="border p-2">{c.district}</td>
+                  <td className="border p-2">{c.stream?.join(", ")}</td>
+                  <td className="border p-2 flex gap-3">
+                    <button onClick={() => editCollege(c)}>
+                      <Pencil size={18} className="text-blue-600" />
+                    </button>
+                    <button onClick={() => deleteCollege(c.id)}>
+                      <Trash2 size={18} className="text-red-600" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
