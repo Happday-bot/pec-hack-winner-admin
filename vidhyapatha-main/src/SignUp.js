@@ -46,7 +46,7 @@ function SignUp({ onSignup }) {
         setLoading(true);
 
         const { data: existing, error: checkError } = await supabase
-            .from("profiles")
+            .from("profile_admin")
             .select("id")
             .eq("email", form.email)
             .maybeSingle();
@@ -84,7 +84,7 @@ function SignUp({ onSignup }) {
         sessionStorage.setItem("isAuthenticated", "true");
         sessionStorage.setItem("signUpEmail", form.email);
 
-        const { error: profileError } = await supabase.from("profiles").insert({
+        const { error: profileError } = await supabase.from("profile_admin").insert({
             fullname: form.name,
             email: form.email,
         });
@@ -99,7 +99,7 @@ function SignUp({ onSignup }) {
         }
 
         onSignup?.();
-        navigate("/profile-setup-basic");
+        navigate("/signin");
         setLoading(false);
     };
 

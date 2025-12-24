@@ -188,7 +188,7 @@ function SignIn({ onLogin }) {
             }
 
             const { data: profileData, error: profileError } = await supabase
-                .from("profiles")
+                .from("profile_admin")
                 .select("*")
                 .eq("email", data.user.email)
                 .single();
@@ -197,10 +197,20 @@ function SignIn({ onLogin }) {
                 console.log("Profile fetch error:", profileError);
             }
 
+            // Check if any field in the profileData is null
+            const hasNullField = Object.values(profileData || {}).some(
+                (value) => value === null
+            );
+
+            if (hasNullField) {
+                navigate("/profile-setup-basic");
+                return;
+            }
+
+            // All fields are filled, proceed
             sessionStorage.setItem("isAuthenticated", "true");
             sessionStorage.setItem("userName", profileData?.fullname || "User");
             sessionStorage.setItem("userEmail", data.user.email);
-            sessionStorage.setItem("qualification", profileData?.qualification);
 
             onLogin?.();
             navigate("/dashboard");
@@ -234,10 +244,9 @@ function SignIn({ onLogin }) {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             className={`shadow appearance-none border rounded w-full py-5 px-6 text-lg bg-[#F5F6FF] focus:outline-none focus:ring-2
-                                ${
-                                    errors.email
-                                        ? "border-red-500 focus:ring-red-300"
-                                        : "border-[#C7CBFF] focus:ring-[#6B74FF]"
+                                ${errors.email
+                                    ? "border-red-500 focus:ring-red-300"
+                                    : "border-[#C7CBFF] focus:ring-[#6B74FF]"
                                 }`}
                         />
 
@@ -261,10 +270,9 @@ function SignIn({ onLogin }) {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             className={`shadow appearance-none border rounded w-full py-5 px-6 text-lg bg-[#F5F6FF] focus:outline-none focus:ring-2
-                                ${
-                                    errors.password
-                                        ? "border-red-500 focus:ring-red-300"
-                                        : "border-[#C7CBFF] focus:ring-[#6B74FF]"
+                                ${errors.password
+                                    ? "border-red-500 focus:ring-red-300"
+                                    : "border-[#C7CBFF] focus:ring-[#6B74FF]"
                                 }`}
                         />
 
