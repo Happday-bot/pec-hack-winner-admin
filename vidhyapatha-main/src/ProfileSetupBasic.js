@@ -38,6 +38,8 @@ export default function ProfileSetupBasic({ /* onUpdateDepartment, */ onLogin })
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
+  const email = sessionStorage.getItem("signUpEmail") || sessionStorage.getItem("userEmail")
+
   const [form, setForm] = useState({
     firstName: "",
     middleName: "",
@@ -64,17 +66,22 @@ export default function ProfileSetupBasic({ /* onUpdateDepartment, */ onLogin })
 
     const { error } = await supabase
       .from("profile_admin")
-      .insert([
+      .upsert(
+        [
+          {
+            email: email,           // REQUIRED for conflict target
+            first_name: form.firstName,
+            middle_name: form.middleName,
+            last_name: form.lastName,
+            dob: form.dob,
+            phone: Number(form.phone),
+            gender: form.gender,
+          },
+        ],
         {
-          first_name: form.firstName,
-          middle_name: form.middleName,
-          last_name: form.lastName,
-          dob: form.dob,
-          phone: Number(form.phone),
-          gender: form.gender,
-          // department: form.department,
-        },
-      ]);
+          onConflict: "email",
+        }
+      );
 
     setLoading(false);
 
