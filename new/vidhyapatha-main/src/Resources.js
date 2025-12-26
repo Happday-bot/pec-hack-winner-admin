@@ -8,18 +8,24 @@ export default function AdminEBooks() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
-  const emptyForm = {
-    category: "",
-    subjects: "",
-    language: "",
-    data: "",
-    title: "",
-    description: "",
-    state: "",
-    class: "",
-  };
+  const RESOURCE_FIELDS = {
+  category: "text",
+  subjects: "text",  // comma-separated string input
+  language: "text",
+  data: "text",
+  title: "text",
+  description: "text",
+  state: "text",
+  class: "text",
+};
 
-  const [form, setForm] = useState(emptyForm);
+const emptyResourceForm = Object.keys(RESOURCE_FIELDS).reduce((acc, key) => {
+  acc[key] = "";
+  return acc;
+}, {});
+
+
+  const [form, setForm] = useState(emptyResourceForm);
 
   /* ---------------- FETCH ---------------- */
   const fetchResources = async () => {
@@ -43,22 +49,63 @@ export default function AdminEBooks() {
     setForm((p) => ({ ...p, [name]: value }));
   };
 
-  const handleSave = async () => {
-    if (editingId) {
-      await supabase.from("resource").update(form).eq("id", editingId);
+
+const handleSave = async () => {
+  const payload = {};
+
+  Object.entries(RESOURCE_FIELDS).forEach(([key, type]) => {
+    if (type === "array") {
+      payload[key] = form[key]
+        ? form[key].split(",").map((v) => v.trim()).filter(Boolean)
+        : [];
     } else {
-      await supabase.from("resource").insert([form]);
+      payload[key] = form[key] || null;
     }
+  });
+
+  try {
+    if (editingId) {
+      const { error } = await supabase
+        .from("resource")
+        .update(payload)
+        .eq("id", editingId);
+
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from("resource").insert([payload]);
+      if (error) throw error;
+    }
+
 
     resetForm();
     fetchResources();
-  };
+  } catch (err) {
+    console.error("Save failed:", err);
+    alert("Save failed. Check console for details.");
+  }
+};
 
-  const handleEdit = (resource) => {
-    setForm(resource);
-    setEditingId(resource.id);
-    setShowForm(true);
-  };
+
+const handleEdit = (resource) => {
+  const filled = {};
+
+  Object.keys(RESOURCE_FIELDS).forEach((key) => {
+    if (key === "subjects") {
+      // If it's already a string, just use it
+      filled[key] = resource[key] || "";
+    } else {
+      filled[key] = resource[key] || "";
+    }
+  });
+
+  console.log("Editing resource:", filled);
+  console.log({ showForm, editingId, form });
+
+  setForm(filled);
+  setEditingId(resource.id);
+  setShowForm(true);
+};
+
 
   const handleDelete = async (id) => {
     if (window.confirm("Delete this resource?")) {
@@ -68,7 +115,7 @@ export default function AdminEBooks() {
   };
 
   const resetForm = () => {
-    setForm(emptyForm);
+    setForm(emptyResourceForm);
     setEditingId(null);
     setShowForm(false);
   };

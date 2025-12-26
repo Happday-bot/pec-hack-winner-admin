@@ -8,77 +8,124 @@ export default function AdminExaminations() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
-  const emptyForm = {
-    name: "",
-    description: "",
-    pattern: "",
-    fees: "",
-    syllabus: "",
-    difficulty: "",
-    tags: "",
-  };
+  const EXAM_FIELDS = {
+  name: "text",
+  short_name: "text",
+  provider: "text",
+  qual_level: "text",
+  allowed_domains: "array", // text[]
+  min_age: "number",
+  max_age: "number",
+  website: "text",
+  exam_date: "date",
+  application_start: "date",
+  application_end: "date",
+  description: "text",
+  pattern: "text",
+  fees: "text",
+  syllabus: "text",
+  difficulty: "text",
+  tags: "array", // text[]
+  region: "text",
+};
 
-  const [form, setForm] = useState(emptyForm);
+const emptyForm = Object.keys(EXAM_FIELDS).reduce((acc, key) => {
+  acc[key] = "";
+  return acc;
+}, {});
 
-  /* ---------------- FETCH ---------------- */
-  const fetchExams = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("examinations")
-      .select("*")
-      .order("id");
+const [form, setForm] = useState(emptyForm);
 
-    if (!error) setExams(data || []);
-    setLoading(false);
-  };
+/* ---------------- FETCH ---------------- */
+const fetchExams = async () => {
+  setLoading(true);
+  const { data, error } = await supabase
+    .from("examinations")
+    .select("*")
+    .order("id");
 
-  useEffect(() => {
-    fetchExams();
-  }, []);
+  if (!error) setExams(data || []);
+  setLoading(false);
+};
 
-  /* ---------------- HANDLERS ---------------- */
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((p) => ({ ...p, [name]: value }));
-  };
+useEffect(() => {
+  fetchExams();
+}, []);
 
-  const handleSave = async () => {
-    const payload = {
-      ...form,
-      tags: form.tags.split(",").map((t) => t.trim()),
-    };
+/* ---------------- HANDLE CHANGE ---------------- */
+const handleChange = (e) => {
+  const { name, value } = e.target;
+  setForm((prev) => ({ ...prev, [name]: value }));
+};
 
-    if (editingId) {
-      await supabase.from("examinations").update(payload).eq("id", editingId);
+/* ---------------- SAVE ---------------- */
+const handleSave = async () => {
+  const payload = {};
+
+  Object.entries(EXAM_FIELDS).forEach(([key, type]) => {
+    if (type === "array") {
+      payload[key] = form[key]
+        ? form[key].split(",").map((v) => v.trim()).filter(Boolean)
+        : [];
+    } else if (type === "number") {
+      payload[key] = form[key] ? parseInt(form[key], 10) : null;
+    } else if (type === "date") {
+      const d = new Date(form[key]);
+      payload[key] = !isNaN(d.getTime()) ? d.toISOString().split("T")[0] : null;
     } else {
-      await supabase.from("examinations").insert([payload]);
+      payload[key] = form[key] || null;
     }
+  });
 
-    resetForm();
-    fetchExams();
-  };
+  try {
+    if (editingId) {
+      const { error } = await supabase
+        .from("examinations")
+        .update(payload)
+        .eq("id", editingId);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from("examinations").insert([payload]);
+      if (error) throw error;
+    }
+  } catch (err) {
+    alert("Save failed. Please try again.");
+  }
 
-  const handleEdit = (exam) => {
-    setForm({
-      ...exam,
-      tags: exam.tags?.join(", ") || "",
-    });
-    setEditingId(exam.id);
-    setShowForm(true);
-  };
+  resetForm();
+  fetchExams();
+};
 
-  const handleDelete = async (id) => {
+/* ---------------- EDIT ---------------- */
+const handleEdit = (exam) => {
+  const filled = {};
+  Object.keys(EXAM_FIELDS).forEach((key) => {
+    if (EXAM_FIELDS[key] === "array") {
+      filled[key] = exam[key]?.join(", ") || "";
+    } else {
+      filled[key] = exam[key] || "";
+    }
+  });
+  setForm(filled);
+  setEditingId(exam.id);
+  setShowForm(true);
+};
+
+/* ---------------- DELETE / SOFT DELETE ---------------- */
+ const handleDelete = async (id) => {
     if (window.confirm("Delete this examination?")) {
       await supabase.from("examinations").delete().eq("id", id);
       fetchExams();
     }
   };
 
-  const resetForm = () => {
-    setForm(emptyForm);
-    setEditingId(null);
-    setShowForm(false);
-  };
+/* ---------------- RESET FORM ---------------- */
+const resetForm = () => {
+  setForm(emptyForm);
+  setEditingId(null);
+  setShowForm(false);
+};
+
 
   /* ---------------- UI ---------------- */
   return (
@@ -131,9 +178,160 @@ export default function AdminExaminations() {
           value={form.name}
           onChange={handleChange}
           className="border rounded-lg p-2"
+          placeholder="Eg: Joint Entrance Examination Main"
+        />
+      </div>
+
+      {/* Name */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium">Short Name</label>
+        <input
+          name="short_name"
+          value={form.short_name}
+          onChange={handleChange}
+          className="border rounded-lg p-2"
           placeholder="Eg: JEE Main"
         />
       </div>
+
+      {/* Name */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium">Provider</label>
+        <input
+          name="provider"
+          value={form.provider}
+          onChange={handleChange}
+          className="border rounded-lg p-2"
+          placeholder="Eg: NTA"
+        />
+      </div>
+
+      {/* Qualification */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium">Qualification Level</label>
+        <input
+          name="qual_level"
+          value={form.qual_level}
+          onChange={handleChange}
+          className="border rounded-lg p-2"
+          placeholder="Eg: 12th"
+        />
+      </div>
+
+      {/* Domain */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium">Domain</label>
+        <input
+          name="allowed_domains"
+          value={form.allowed_domains}
+          onChange={handleChange}
+          className="border rounded-lg p-2"
+          placeholder="Eg: Engineering, Medical"
+        />
+      </div>
+
+      {/* Age */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium">Minimum Age</label>
+        <input
+          type="number"
+          name="min_age"
+          value={form.min_age}
+          onChange={handleChange}
+          className="border rounded-lg p-2"
+          placeholder="Eg: 18"
+        />
+      </div>
+
+      {/* Age */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium">Maximum Age</label>
+        <input
+          type="number"
+          name="max_age"
+          value={form.max_age}
+          onChange={handleChange}
+          className="border rounded-lg p-2"
+          placeholder="Eg: 30"
+        />
+      </div>
+
+      {/* Website */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium">Website</label>
+        <input
+          name="website"
+          value={form.website}
+          onChange={handleChange}
+          className="border rounded-lg p-2"
+          placeholder="Eg: https://jeemain.nta.nic.in"
+        />
+      </div>
+
+      {/* Date */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium">Exam Date</label>
+        <input
+          type="date"
+          name="exam_date"
+          value={form.exam_date}
+          onChange={handleChange}
+          className="border rounded-lg p-2"
+        />
+      </div>
+
+      {/* Application Date */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium">Application Start</label>
+        <input
+          type="date"
+          name="application_start"
+          value={form.application_start}
+          onChange={handleChange}
+          className="border rounded-lg p-2"
+          placeholder="Eg: 2024-01-01"
+        />
+      </div>
+
+      {/* Application Date */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium">Application End</label>
+        <input
+          type="date"
+          name="application_end"
+          value={form.application_end}
+          onChange={handleChange}
+          className="border rounded-lg p-2"
+          placeholder="Eg: 2024-01-01"
+        />
+      </div>
+
+      {/* Description */}
+      <div className="flex flex-col gap-1 md:col-span-2">
+        <label className="text-sm font-medium">Description</label>
+        <textarea
+          name="description"
+          value={form.description}
+          onChange={handleChange}
+          rows={3}
+          className="border rounded-lg p-2"
+          placeholder="Brief overview of the examination"
+        />
+      </div>
+
+       {/* Pattern */}
+      <div className="flex flex-col gap-1 md:col-span-2">
+        <label className="text-sm font-medium">Exam Pattern</label>
+        <textarea
+          name="pattern"
+          value={form.pattern}
+          onChange={handleChange}
+          rows={3}
+          className="border rounded-lg p-2"
+          placeholder="Eg:MCQ, duration, marking scheme"
+        />
+      </div>
+
 
       {/* Fees */}
       <div className="flex flex-col gap-1">
@@ -147,6 +345,20 @@ export default function AdminExaminations() {
           placeholder="Eg: 1000"
         />
       </div>
+
+            {/* Syllabus */}
+      <div className="flex flex-col gap-1 md:col-span-2">
+        <label className="text-sm font-medium">Syllabus</label>
+        <textarea
+          name="syllabus"
+          value={form.syllabus}
+          onChange={handleChange}
+          rows={4}
+          className="border rounded-lg p-2"
+          placeholder="Eg:Physics, Chemistry, Maths..."
+        />
+      </div>
+      
 
       {/* Difficulty */}
       <div className="flex flex-col gap-1">
@@ -172,46 +384,19 @@ export default function AdminExaminations() {
           value={form.tags}
           onChange={handleChange}
           className="border rounded-lg p-2"
-          placeholder="Engineering, Medical, Govt"
+          placeholder="Eg:Engineering, Medical, Govt"
         />
       </div>
 
-      {/* Description */}
+            {/* Region */}
       <div className="flex flex-col gap-1 md:col-span-2">
-        <label className="text-sm font-medium">Description</label>
+        <label className="text-sm font-medium">Region</label>
         <textarea
-          name="description"
-          value={form.description}
+          name="region"
+          value={form.region}
           onChange={handleChange}
-          rows={3}
           className="border rounded-lg p-2"
-          placeholder="Brief overview of the examination"
-        />
-      </div>
-
-      {/* Pattern */}
-      <div className="flex flex-col gap-1 md:col-span-2">
-        <label className="text-sm font-medium">Exam Pattern</label>
-        <textarea
-          name="pattern"
-          value={form.pattern}
-          onChange={handleChange}
-          rows={3}
-          className="border rounded-lg p-2"
-          placeholder="MCQ, duration, marking scheme"
-        />
-      </div>
-
-      {/* Syllabus */}
-      <div className="flex flex-col gap-1 md:col-span-2">
-        <label className="text-sm font-medium">Syllabus</label>
-        <textarea
-          name="syllabus"
-          value={form.syllabus}
-          onChange={handleChange}
-          rows={4}
-          className="border rounded-lg p-2"
-          placeholder="Physics, Chemistry, Maths..."
+          placeholder="Eg:Tamil Nadu"
         />
       </div>
     </div>
@@ -243,7 +428,7 @@ export default function AdminExaminations() {
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-100 text-slate-700">
                   <tr>
-                    <th className="px-4 py-3">Name</th>
+                    <th className="px-4 py-3">Exam Name</th>
                     <th className="px-4 py-3">Pattern</th>
                     <th className="px-4 py-3">Fees</th>
                     <th className="px-4 py-3">Difficulty</th>

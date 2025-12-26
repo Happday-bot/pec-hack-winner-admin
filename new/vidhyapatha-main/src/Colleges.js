@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback,useEffect, useState } from "react";
 import { supabase } from "./supabase";
 import { Pencil, Trash2, Plus } from "lucide-react";
 
@@ -10,8 +10,11 @@ const COLLEGE_FIELDS = {
   address: "text",
   state: "text",
   district: "text",
+  contact: "json",
+  email: "json",
   stream: "json",
   degrees: "json",
+  courses_ids: "json",
   medium: "text",
   eligible: "text",
   duration: "text",
@@ -24,15 +27,20 @@ const COLLEGE_FIELDS = {
   food: "text",
   transport: "text",
   sports: "text",
+  disable: "text",
   placements: "text",
   career: "text",
-  alumni: "text",
+  alumini: "text",   // match backend spelling
   clubs: "text",
   rating: "text",
   cutoff: "json",
   gender: "text",
   website: "text",
+  college_pic: "text",
+  latitude: "text",
+  longitude: "text",
 };
+
 
 const emptyCollege = Object.keys(COLLEGE_FIELDS).reduce((a, k) => {
   a[k] = "";
@@ -81,7 +89,7 @@ export default function AdminColleges() {
   }, []);
 
   /* ---------------- FETCH COLLEGES ---------------- */
-  const fetchColleges = async () => {
+const fetchColleges = useCallback(async () => {
   setLoading(true);
 
   let q = supabase.from("colleges").select("*");
@@ -96,12 +104,12 @@ export default function AdminColleges() {
   const { data } = await q;
   setColleges(data || []);
   setLoading(false);
-};
+}, [filters, search]); // ✅ dependencies here
 
+useEffect(() => {
+  fetchColleges(); // ✅ useEffect depends on fetchColleges
+}, [fetchColleges]);
 
-  useEffect(() => {
-  fetchColleges();
-}, [filters, search]);
 
 
   /* ---------------- SAVE (ADD / EDIT) ---------------- */

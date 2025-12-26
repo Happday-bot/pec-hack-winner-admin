@@ -8,16 +8,16 @@ const SCHOLARSHIP_FIELDS = {
   provider: "text",
   type: "text",
   region: "text",
-  education_level: "json",
+  education_level: "array",
   gender: "text",
-  category: "json",
-  income_limit: "text",
+  category: "array",
+  income_limit: "bigint",
   amount_benefit: "text",
-  deadline: "text",
+  deadline: "date",
   link: "text",
   description: "text",
   eligibility_details: "text",
-  documents_needed: "json",
+  documents_needed: "array",
 };
 
 const emptyScholarship = Object.keys(SCHOLARSHIP_FIELDS).reduce((a, k) => {
@@ -61,15 +61,23 @@ export default function AdminScholarships() {
   const saveScholarship = async () => {
     const payload = {};
 
-    Object.entries(SCHOLARSHIP_FIELDS).forEach(([k, t]) => {
-      payload[k] =
-        t === "json"
-          ? formData[k]
-              .split(",")
-              .map(v => v.trim())
-              .filter(Boolean)
-          : formData[k];
-    });
+    const arrayFields = ["category", "education_level", "documents_needed"];
+
+Object.entries(SCHOLARSHIP_FIELDS).forEach(([k, t]) => {
+  if (arrayFields.includes(k)) {
+    payload[k] = formData[k]
+      .split(",")
+      .map(v => v.trim())
+      .filter(Boolean);
+  }else {
+  payload[k] =
+    k === "income_limit"
+      ? formData[k] ? parseInt(formData[k], 10) : null
+      : formData[k] || null;
+}
+});
+
+if (!editingId) delete payload.id; // Ensure 'disable' is not set when adding new scholarship
 
     const query = editingId
       ? supabase.from("scholarships").update(payload).eq("id", editingId)
@@ -105,6 +113,8 @@ export default function AdminScholarships() {
     await supabase.from("scholarships").delete().eq("id", id);
     fetchScholarships();
   };
+
+
 
   /* ---------------- FILTERED DATA (NEW) ---------------- */
   const filteredScholarships = scholarships.filter(s => {
