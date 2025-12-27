@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "./supabase";
 
@@ -26,17 +26,16 @@ const Select = ({ label, name, value, onChange, options }) => (
       className="w-full border border-[#C7CBFF] rounded-lg p-2 focus:ring-2 focus:ring-[#6B74FF]"
     >
       {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
+        <option key={opt.value} value={opt.value}>{opt.label}</option>
       ))}
     </select>
   </div>
 );
 
-export default function ProfileSetupBasic({ /* onUpdateDepartment, */ onLogin }) {
+export default function ProfileSetupBasic({ onLogin }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState(null);
 
   const [form, setForm] = useState({
     firstName: "",
@@ -45,8 +44,40 @@ export default function ProfileSetupBasic({ /* onUpdateDepartment, */ onLogin })
     dob: "",
     phone: "",
     gender: "",
-    // department: "",
   });
+
+  useEffect(() => {
+    const storedUserId = sessionStorage.getItem("userId");
+    if (!storedUserId) {
+      alert("Session expired. Please log in again.");
+      navigate("/signin");
+      return;
+    }
+    setUserId(storedUserId);
+
+    const fetchProfile = async () => {
+      const { data, error } = await supabase
+        .from("profile_admin")
+        .select("*")
+        .eq("user_id", storedUserId)
+        .single();
+
+      if (data) {
+        setForm({
+          firstName: data.first_name || "",
+          middleName: data.middle_name || "",
+          lastName: data.last_name || "",
+          dob: data.dob || "",
+          phone: data.phone || "",
+          gender: data.gender || "",
+        });
+      }
+
+      if (error && error.code !== "PGRST116") console.error("Error fetching profile:", error);
+    };
+
+    fetchProfile();
+  }, [navigate]);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -54,27 +85,21 @@ export default function ProfileSetupBasic({ /* onUpdateDepartment, */ onLogin })
 
   const handleNext = async (e) => {
     e.preventDefault();
-
-    // if (!form.department) {
-    //   alert("Please select a Department");
-    //   return;
-    // }
+    if (!userId) return;
 
     setLoading(true);
 
     const { error } = await supabase
       .from("profile_admin")
-      .insert([
-        {
-          first_name: form.firstName,
-          middle_name: form.middleName,
-          last_name: form.lastName,
-          dob: form.dob,
-          phone: Number(form.phone),
-          gender: form.gender,
-          // department: form.department,
-        },
-      ]);
+      .update({
+        first_name: form.firstName,
+        middle_name: form.middleName,
+        last_name: form.lastName,
+        dob: form.dob,
+        phone: Number(form.phone),
+        gender: form.gender,
+      })
+      .eq("user_id", userId);
 
     setLoading(false);
 
@@ -82,60 +107,21 @@ export default function ProfileSetupBasic({ /* onUpdateDepartment, */ onLogin })
       console.error("Supabase error:", error);
       alert(error.message);
     } else {
-      // if (onUpdateDepartment) onUpdateDepartment(form.department);
-      onLogin(); // sets React state + sessionStorage
+      onLogin(); // set React state + sessionStorage
       navigate("/dashboard");
     }
   };
 
   return (
     <div className="max-w-5xl mx-auto bg-white shadow-lg rounded-xl p-10 border border-[#C7CBFF]">
-      <h1 className="text-2xl font-bold mb-8 text-center text-[#444EE7]">
-        Profile Setup – General Info
-      </h1>
-
+      <h1 className="text-2xl font-bold mb-8 text-center text-[#444EE7]">Profile Setup – General Info</h1>
       <form onSubmit={handleNext}>
         <div className="grid grid-cols-1 gap-y-6">
-          <Input
-            label="First Name *"
-            name="firstName"
-            value={form.firstName}
-            onChange={handleChange}
-            required
-          />
-
-          <Input
-            label="Middle Name"
-            name="middleName"
-            value={form.middleName}
-            onChange={handleChange}
-          />
-
-          <Input
-            label="Last Name *"
-            name="lastName"
-            value={form.lastName}
-            onChange={handleChange}
-            required
-          />
-
-          <Input
-            label="Date of Birth *"
-            type="date"
-            name="dob"
-            value={form.dob}
-            onChange={handleChange}
-            required
-          />
-
-          <Input
-            label="Phone Number *"
-            name="phone"
-            value={form.phone}
-            onChange={handleChange}
-            required
-          />
-
+          <Input label="First Name *" name="firstName" value={form.firstName} onChange={handleChange} required />
+          <Input label="Middle Name" name="middleName" value={form.middleName} onChange={handleChange} />
+          <Input label="Last Name *" name="lastName" value={form.lastName} onChange={handleChange} required />
+          <Input label="Date of Birth *" type="date" name="dob" value={form.dob} onChange={handleChange} required />
+          <Input label="Phone Number *" name="phone" value={form.phone} onChange={handleChange} required />
           <Select
             label="Gender *"
             name="gender"
@@ -150,8 +136,6 @@ export default function ProfileSetupBasic({ /* onUpdateDepartment, */ onLogin })
           />
         </div>
 
-        {/* Department section removed */}
-
         <div className="text-center">
           <button
             type="submit"
@@ -165,3 +149,7 @@ export default function ProfileSetupBasic({ /* onUpdateDepartment, */ onLogin })
     </div>
   );
 }
+
+
+
+
